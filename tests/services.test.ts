@@ -1,0 +1,4 @@
+import { describe, expect, it } from 'vitest';
+import { matchService, newsService, searchAll } from '../services';
+import { formatDate } from '../lib/utils';
+describe('mock services',()=>{it('retrieves a match by slug',async()=>{const matches=await matchService.list();expect(await matchService.get(matches[0].slug)).toEqual(matches[0]);});it('returns undefined for unknown articles',async()=>{expect(await newsService.get('unknown')).toBeUndefined();});it('searches across entities case insensitively',async()=>{const results=await searchAll('INDIA');expect(results.some(x=>x.type==='Team')).toBe(true);expect(results.some(x=>x.type==='Match')).toBe(true);});it('returns an empty result for blank and unknown queries',async()=>{expect(await searchAll('  ')).toEqual([]);expect(await searchAll('zzzzzz')).toEqual([]);});it('formats editorial dates in UTC',()=>{expect(formatDate('2026-11-13T09:00:00Z')).toBe('13 Nov 2026');});});
