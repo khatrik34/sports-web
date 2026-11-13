@@ -1,0 +1,1 @@
+export const site = { name:'The Boundary', description:'The stories, scores and moments that make sport matter.', url:process.env.NEXT_PUBLIC_SITE_URL || 'https://boundary.example', apiBaseUrl:process.env.NEXT_PUBLIC_API_BASE_URL || '' };
