@@ -12,10 +12,10 @@ npm install
 Copy-Item .env.example .env.local
 # Edit .env.local: API_BASE_URL must be reachable from the Next.js server.
 npm run dev
-# Alternative port: npm run dev -- -p 3001
+# Alternative port: npm run dev -- -p 3002
 ```
 
-Open `http://localhost:3000` (or 3001). Set `NEXT_PUBLIC_SITE_URL` to the actual website origin and configure backend `APP_PUBLIC_SITE_BASE_URL` to match, including the port. `API_BASE_URL=http://localhost:8080/api/v1` works only when Next.js and the backend run on the same machine/network namespace. It is **server-side only**; when deployed or previewed elsewhere, `localhost` on the user's computer is not reachable by the Next.js server. Use a reachable private backend hostname, not browser-side localhost calls. The API must be available at request time; outages produce errors, not invented scores.
+Open `http://localhost:3001` (the admin can continue using port 3000). Both `npm run dev` and `npm start` default to 3001; an explicit `PORT` environment variable or `-p` argument overrides it. If you already have `.env.local`, update `NEXT_PUBLIC_SITE_URL=http://localhost:3001` there as well. Set `NEXT_PUBLIC_SITE_URL` to the actual website origin and configure backend `APP_PUBLIC_SITE_BASE_URL` to match, including the port. `API_BASE_URL=http://localhost:8080/api/v1` works only when Next.js and the backend run on the same machine/network namespace. It is **server-side only**; when deployed or previewed elsewhere, `localhost` on the user's computer is not reachable by the Next.js server. Use a reachable private backend hostname, not browser-side localhost calls. The API must be available at request time; outages produce errors, not invented scores.
 
 ## Verification
 

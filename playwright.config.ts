@@ -7,7 +7,7 @@ export default defineConfig({
   fullyParallel: false,
   reporter: "list",
   use: {
-    baseURL: process.env.E2E_SITE_URL || "http://localhost:3000",
+    baseURL: process.env.E2E_SITE_URL || "http://localhost:3001",
     browserName: "chromium",
     trace: "retain-on-failure",
   },
