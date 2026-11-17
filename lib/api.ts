@@ -17,16 +17,33 @@ export async function apiRequest<T>(
   schema: z.ZodType<T>,
   options: { fresh?: boolean; timeoutMs?: number } = {},
 ): Promise<T> {
-  const base = process.env.API_BASE_URL;
-  if (!base) throw new ServiceError("API_BASE_URL is not configured.");
+  const base =
+    process.env.API_BASE_URL ||
+    (process.env.NODE_ENV === "development"
+      ? "http://127.0.0.1:8080/api/v1"
+      : undefined);
+  if (!base)
+    throw new ServiceError(
+      "API_BASE_URL is not configured.",
+      undefined,
+      "api_not_configured",
+    );
   if (!path.startsWith("/public/") && path !== "/public/homepage")
     throw new ServiceError("Invalid public API path.");
   let url: URL;
   try {
     url = new URL(base.replace(/\/$/, "") + path);
     if (!["http:", "https:"].includes(url.protocol)) throw new Error();
+    // In local development the backend commonly listens on IPv4 only. Keep
+    // explicitly configured remote hosts and production settings untouched.
+    if (process.env.NODE_ENV === "development" && url.hostname === "localhost")
+      url.hostname = "127.0.0.1";
   } catch {
-    throw new ServiceError("API_BASE_URL is invalid.");
+    throw new ServiceError(
+      "API_BASE_URL is invalid.",
+      undefined,
+      "invalid_api_base_url",
+    );
   }
   let response: Response;
   try {
@@ -40,6 +57,8 @@ export async function apiRequest<T>(
   } catch {
     throw new ServiceError(
       "The sports service is unavailable. Please try again shortly.",
+      undefined,
+      "upstream_unreachable",
     );
   }
   if (!response.ok) {
