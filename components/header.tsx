@@ -1,7 +1,96 @@
-'use client';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Menu, Search, X, ArrowUpRight } from 'lucide-react';
-import { useState } from 'react';
-const links=[['Home','/'],['Cricket','/cricket'],['Live Scores','/cricket/live-scores'],['News','/news'],['Videos','/videos'],['Series','/cricket/series'],['Teams','/teams'],['Rankings','/rankings']];
-export function Header(){const [open,setOpen]=useState(false);const pathname=usePathname();return <><div className="utility"><div className="shell utility-inner"><span>INDEPENDENT SPORTS JOURNALISM <span className="utility-dot">✳</span> FOR THE LOVE OF THE GAME</span><span>FRIDAY, 13 NOVEMBER 2026 <span className="utility-dot">/</span> DEMO EDITION</span></div></div><header className="header"><div className="shell header-inner"><Link href="/" className="brand" aria-label="The Boundary home"><span className="brand-mark"><i></i><i></i><i></i></span><span>THE<br/><b>BOUNDARY</b></span><span className="brand-period">.</span></Link><nav className="desktop-nav" aria-label="Main navigation">{links.map(([label,href])=><Link key={href} href={href} className={(href==='/'?pathname==='/' : pathname===href || (href!='/cricket' && pathname.startsWith(href+'/'))) ? 'active':''}>{label}</Link>)}</nav><div className="header-actions"><Link className="search-link" href="/search" aria-label="Search"><Search size={20}/></Link><Link className="header-cta" href="/cricket/live-scores"><span className="live-dot"/> LIVE SCORES <ArrowUpRight size={15}/></Link><button className="menu-button" onClick={()=>setOpen(!open)} aria-label={open?'Close menu':'Open menu'} aria-expanded={open}>{open?<X/>:<Menu/>}</button></div></div>{open&&<nav className="mobile-nav" aria-label="Mobile navigation">{links.map(([label,href])=><Link onClick={()=>setOpen(false)} href={href} key={href}>{label}<ArrowUpRight size={16}/></Link>)}</nav>}</header></>}
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Menu, Search, X, ArrowUpRight } from "lucide-react";
+import { useState } from "react";
+const links = [
+  ["Home", "/"],
+  ["Cricket", "/cricket"],
+  ["Live Scores", "/cricket/live-scores"],
+  ["News", "/news"],
+  ["Videos", "/videos"],
+  ["Series", "/cricket/series"],
+  ["Teams", "/teams"],
+  ["Rankings", "/rankings"],
+];
+export function Header() {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  return (
+    <>
+      <div className="utility">
+        <div className="shell utility-inner">
+          <span>
+            INDEPENDENT SPORTS JOURNALISM <span className="utility-dot">✳</span>{" "}
+            FOR THE LOVE OF THE GAME
+          </span>
+          <span>INDEPENDENT SPORTS COVERAGE</span>
+        </div>
+      </div>
+      <header className="header">
+        <div className="shell header-inner">
+          <Link href="/" className="brand" aria-label="The Boundary home">
+            <span className="brand-mark">
+              <i></i>
+              <i></i>
+              <i></i>
+            </span>
+            <span>
+              THE
+              <br />
+              <b>BOUNDARY</b>
+            </span>
+            <span className="brand-period">.</span>
+          </Link>
+          <nav className="desktop-nav" aria-label="Main navigation">
+            {links.map(([label, href]) => (
+              <Link
+                key={href}
+                href={href}
+                className={
+                  (
+                    href === "/"
+                      ? pathname === "/"
+                      : pathname === href ||
+                        (href != "/cricket" && pathname.startsWith(href + "/"))
+                  )
+                    ? "active"
+                    : ""
+                }
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+          <div className="header-actions">
+            <Link className="search-link" href="/search" aria-label="Search">
+              <Search size={20} />
+            </Link>
+            <Link className="header-cta" href="/cricket/live-scores">
+              <span className="live-dot" /> LIVE SCORES{" "}
+              <ArrowUpRight size={15} />
+            </Link>
+            <button
+              className="menu-button"
+              onClick={() => setOpen(!open)}
+              aria-label={open ? "Close menu" : "Open menu"}
+              aria-expanded={open}
+            >
+              {open ? <X /> : <Menu />}
+            </button>
+          </div>
+        </div>
+        {open && (
+          <nav className="mobile-nav" aria-label="Mobile navigation">
+            {links.map(([label, href]) => (
+              <Link onClick={() => setOpen(false)} href={href} key={href}>
+                {label}
+                <ArrowUpRight size={16} />
+              </Link>
+            ))}
+          </nav>
+        )}
+      </header>
+    </>
+  );
+}

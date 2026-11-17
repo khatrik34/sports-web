@@ -1,6 +1,6 @@
 # Existing public frontend: integration audit
 
-Status: **inventory and design proposal**, not an implemented backend integration. Audited against `43ab649` on 2026-11-13. The public UI is unchanged by this audit. The named admin and backend repositories were not accessible from this session: initial requests returned HTTP 404 and later requests returned “Resource not accessible by integration”; their contents could not be verified. Do not treat proposed contracts below as existing APIs.
+Status: **historical inventory and design proposal** for the frontend at the audited commit. For the subsequent integration work and its current limitations, see `public-api-integration.md`. Audited against `43ab649` on 2026-11-13. The public UI is unchanged by this audit. At audit time the named admin and backend repositories were inaccessible; they were later made public and the backend contract was reviewed for the subsequent website integration. Do not treat proposed contracts below as existing APIs.
 
 ## Baseline architecture
 
