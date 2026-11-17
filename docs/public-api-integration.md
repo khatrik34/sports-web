@@ -1,0 +1,29 @@
+# Public API integration status
+
+Backend contract inspected at `sports-web-backend` commit `c664e30beaf8d779329f3678239347a6443ac387`, including `docs/WEBSITE_INTEGRATION_BRIEF.md`, `docs/CONTRACTS.md` and Java DTO/controller sources. When the documentation differs from controller code, this site follows the controller: `/public/categories` rather than `/public/news/categories`; `filter=live|upcoming|recent` rather than `status=LIVE`; and match dates as `date` or the inclusive UTC date range `from`/`to` (not both). Backend paginated lists have `content/page/size/totalElements/totalPages/first/last`, while tournaments, homepage, standings and sitemap feeds are arrays. Website types are mapped view models, not identical to the backend DTOs.
+
+## Coverage
+
+- `/`: enabled homepage blocks, referenced articles, score strip, standings and videos. The backend returns an array, not an object with `sections`. The demo CUSTOM article-slug block is rendered; other unknown block types are skipped. On an empty configuration, site-defined block defaults call the published endpoints. Explicit `articleSlugs`, `matchSlugs`, `videoSlugs`, `limit`, match `statuses`, and points `series`/`tournamentSlug` are honored. No hardcoded editorial content is substituted.
+- `/news`, `/news/latest`, `/news/featured`, `/news/categories`, `/news/{slug}`: categories and pagination; detail body sanitization; server-rendered SEO metadata/JSON-LD and API canonical. `/news/trending` honestly shows latest because no trending endpoint exists.
+- Scores, fixtures, match details, scorecards, commentary, tournament standings, teams and player profiles use public APIs. Match and commentary requests are uncached. Playing XI and player career statistics do not have endpoints and show an empty state rather than invented data. Top-scorer/wicket views likewise have no backend endpoint.
+- Video listing/detail and public search use their respective endpoints. Video detail links to the URL from the API rather than embedding arbitrary third-party content.
+- Main sitemap combines backend article feed with public video/team/player/match/tournament data and static URLs; news sitemap uses the backend feed. Unknown and legacy document paths are checked against the redirect API; 301/302/307/308 and 410 are supported. API errors aren't interpreted as not-found content.
+
+## Verification and open limitations
+
+- Typecheck, ESLint, production build, and isolated unit tests run in this workspace. The tests use synthetic HTTP responses; these are not the user's backend.
+- A temporary local contract fixture was used to check SSR route status, canonical metadata, 301 and 404 handling, sitemap responses and stripping of a malicious script. It was removed/stopped after testing; no test server or sample dataset ships in production. This is not a live database or a browser/visual test.
+- The backend running on the user's computer is not reachable from the sandbox's `localhost`. Therefore the supplied articles, matches, videos and configurations have **not** been tested against the actual running Java service. Browser, accessibility and mobile visual checks also remain to be run on the user's machine.
+- News sitemap and main article sitemap trust backend publication feeds. Source at the inspected commit filters `robots=noindex` from both sitemap feeds; this has not been verified against the user’s running backend version. Non-standard article canonical paths must resolve at the website or via the backend redirect mapping; arbitrary custom article paths are not separately discoverable by slug through the documented API.
+- Homepage match section status filtering follows the documented backend `filter` vocabulary. Backend `config` is arbitrary JSON; unsupported custom configuration/types are skipped rather than interpreted or assumed.
+- `APP_PUBLIC_SITE_BASE_URL` on the backend must match this website's `NEXT_PUBLIC_SITE_URL` or canonical links and sitemap URLs can point to the wrong origin. External images are rendered unoptimized from supplied URLs and must be reachable by the visitor. No upload or image service is added.
+- Newsletter subscriptions are not connected. There is no public external cricket score feed.
+
+## Suggested local smoke tests
+
+After starting both services with matching site origins, visit `/`, `/news`, `/news/categories`, an article, `/cricket/live-scores`, `/cricket/fixtures`, a match with `?tab=scorecard` and `?tab=live-commentary`, a series and points table, `/teams`, a team and player, `/rankings`, `/videos`, a video, `/search?q=...`, `/sitemap.xml`, `/news-sitemap.xml`, and a configured legacy redirect. Check an unknown slug returns 404 and a stopped backend returns an error rather than sample content. Confirm browser devtools show no cross-origin requests to backend API endpoints. Check canonical URLs, robots directives, escaped article markup, and article publication dates against the API response.
+
+## Browser suite against the real backend
+
+Run `npx playwright install chromium` once, start the actual backend and the website, then run `npm run test:e2e`. Set `E2E_SITE_URL` (default `http://localhost:3000`) and `E2E_API_BASE_URL` (default `http://localhost:8080/api/v1`) if required. The test runner calls the Java API directly to compare data with browser-rendered pages; the website itself still makes API requests only server-side. The suite expects the backend's optional demo dataset and its named records, so data changes can require updating expectations. The demo noindex article is older than the 48-hour news-sitemap window, so its absence from that feed alone does not prove noindex filtering there; verify with a recent noindex article too. These tests have not been executed against the running backend here. They supplement rather than replace manual accessibility, responsive, and SEO verification.

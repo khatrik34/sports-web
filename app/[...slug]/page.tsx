@@ -1,41 +1,1282 @@
-import type { Metadata } from 'next';
-import Image from 'next/image';
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { ArrowRight, Play } from 'lucide-react';
-import { ArticleCard, MatchCard, SectionHeading, VideoCard } from '@/components/cards';
-import { matchService, newsService, playerService, tournamentService, videoService, teamService, matchDetailsService, searchAll } from '@/services';
-import { formatDate } from '@/lib/utils';
-import { site } from '@/config/site';
-import type { Match, NewsArticle } from '@/types';
-type Props={params:Promise<{slug:string[]}>;searchParams:Promise<Record<string,string|string[]|undefined>>};
-const val=(v:string|string[]|undefined)=>typeof v==='string'?v:'';
-const titles:Record<string,string>={'cricket':'Cricket','cricket/live-scores':'Live Cricket Scores','cricket/fixtures':'Fixtures & Results','cricket/series':'Series & Tournaments','news':'Latest Sports News','news/latest':'Latest News','news/trending':'Trending Stories','news/featured':'Featured Stories','videos':'Cricket Videos','teams':'Cricket Teams','rankings':'Cricket Rankings','search':'Search','about':'About The Boundary','contact':'Contact'};
-async function identify(path:string[]){const key=path.join('/');if(titles[key])return {title:titles[key],description:`${titles[key]} from The Boundary. Scores, stories and moments for the love of the game.`};if(path[0]==='news'&&path.length===2){const a=await newsService.get(path[1]);if(a)return {title:a.title,description:a.excerpt,image:a.image};}if(path[0]==='cricket'&&path[1]==='news'&&path.length===3)return {title:'Cricket News',description:'The latest cricket stories and analysis.'};if(path[0]==='cricket'&&path[1]==='match'&&path.length===3){const m=await matchService.get(path[2]);if(m)return {title:`${m.team1.name} vs ${m.team2.name} | Match Centre`,description:`${m.tournament} match centre, scorecard and details.`};}if(path[0]==='cricket'&&path[1]==='series'&&path.length===3){const t=await tournamentService.get(path[2]);if(t)return {title:t.name,description:t.description};}if(path[0]==='teams'&&path.length===2){const t=await teamService.get(path[1]);if(t)return {title:`${t.name} Cricket Team`,description:t.description};}if(path[0]==='players'&&path.length===2){const p=await playerService.get(path[1]);if(p)return {title:p.name,description:p.description};}if(path[0]==='videos'&&path.length===2){const v=await videoService.get(path[1]);if(v)return {title:v.title,description:v.description,image:v.image};}return null;}
-export async function generateMetadata({params}:Props):Promise<Metadata>{const {slug}=await params;const info=await identify(slug);if(!info)return {title:'Not found'};const canonical=`/${slug.join('/')}`;return {title:info.title,description:info.description,alternates:{canonical},robots:slug[0]==='search'?{index:false,follow:true}:undefined,openGraph:{title:info.title,description:info.description,url:canonical,images:info.image?[info.image]:undefined},twitter:{card:'summary_large_image',title:info.title,description:info.description,images:info.image?[info.image]:undefined}};}
-function Crumbs({items}:{items:{label:string;href?:string}[]}){return <nav className="breadcrumbs" aria-label="Breadcrumb"><Link href="/">Home</Link>{items.map((item,i)=><span key={i}> / &nbsp; {item.href?<Link href={item.href}>{item.label}</Link>:item.label}</span>)}</nav>}
-function JsonLd({value}:{value:object}){return <script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(value).replace(/</g,'\\u003c')}}/>}
-function PageHeader({kicker='THE BOUNDARY',title,description}:{kicker?:string;title:string;description?:string}){return <div className="page-header"><span className="eyebrow">{kicker}</span><h1>{title}<span className="accent">.</span></h1>{description&&<p>{description}</p>}</div>}
-function Trending({articles}:{articles:NewsArticle[]}){return <aside className="sidebar"><span className="eyebrow">THE CONVERSATION</span><h2>Trending stories<span className="accent">.</span></h2>{articles.slice(0,4).map((a,i)=><Link key={a.slug} href={`/news/${a.slug}`}><span className="accent">0{i+1} &nbsp; </span>{a.title}</Link>)}</aside>}
-function ScoreTable({rows}:{rows:Awaited<ReturnType<typeof matchDetailsService.scorecard>>}){return <div className="data-table-wrap"><table><thead><tr><th>Batter</th><th>Dismissal</th><th>R</th><th>B</th><th>4s</th><th>6s</th></tr></thead><tbody>{rows.map(r=><tr key={r.batter}><td>{r.batter==='Virat Kohli'?<Link href="/players/virat-kohli">{r.batter}</Link>:r.batter}</td><td>{r.dismissal}</td><td><b>{r.runs}</b></td><td>{r.balls}</td><td>{r.fours}</td><td>{r.sixes}</td></tr>)}</tbody></table></div>}
-async function Points(){const points=await matchDetailsService.points();return <div className="data-table-wrap"><table><thead><tr><th>Team</th><th>Played</th><th>Won</th><th>Lost</th><th>Points</th><th>Percentage</th></tr></thead><tbody>{points.map(p=><tr key={p.team}><td>{p.team}</td><td>{p.played}</td><td>{p.won}</td><td>{p.lost}</td><td>{p.points}</td><td>{p.nrr}</td></tr>)}</tbody></table></div>}
-function Filters({base,items,current}:{base:string;items:string[];current:string}){return <nav className="filter-nav" aria-label="Filter content">{items.map(i=><Link className={current===i.toLowerCase()?'selected':''} key={i} href={`${base}${i==='All'?'':`?filter=${encodeURIComponent(i.toLowerCase())}`}`}>{i}</Link>)}</nav>}
-async function MatchPage({match,tab}:{match:Match;tab:string}){const tabs=['Summary','Live Commentary','Scorecard','Full Scorecard','Playing XI','Match Details','Points Table'];const selected=tabs.find(t=>t.toLowerCase().replaceAll(' ','-')===tab)||'Summary';const featured=match.slug==='india-vs-australia-2026';const rows=featured?await matchDetailsService.scorecard():[];const comments=featured?await matchDetailsService.commentary():[];return <><Crumbs items={[{label:'Live Scores',href:'/cricket/live-scores'},{label:`${match.team1.name} vs ${match.team2.name}`}]}/><PageHeader kicker={`${match.format} / ${match.tournament.toUpperCase()}`} title={`${match.team1.name} vs ${match.team2.name}`} description={`${match.venue} · ${formatDate(match.date)} · Demonstration match data`}/><div className="detail-score"><span className="eyebrow">{match.status==='live'?'● LIVE':match.status.toUpperCase()} &nbsp; / &nbsp; {match.format}</span><div className="match-team"><span>{match.team1.flag} &nbsp;{match.team1.name}</span><strong>{match.score1||'—'}</strong></div><div className="match-team"><span>{match.team2.flag} &nbsp;{match.team2.name}</span><strong>{match.score2||'—'}</strong></div><div className="match-bottom">{match.note}</div></div><nav className="filter-nav" aria-label="Match centre tabs">{tabs.map(t=><Link key={t} className={selected===t?'selected':''} href={`/cricket/match/${match.slug}?tab=${t.toLowerCase().replaceAll(' ','-')}`}>{t}</Link>)}</nav>{selected==='Points Table'?<Points/>:selected==='Live Commentary'?<div className="content-box"><h2>Live commentary</h2><p>Illustrative ball-by-ball updates.</p>{!comments.length&&<p>Commentary is not available for this demo match.</p>}{comments.map(c=><div className="commentary-item" key={c.over}><strong>{c.over} · {c.kind}</strong>{c.text}</div>)}</div>:selected==='Playing XI'?<div className="content-box"><h2>Playing XI</h2><p>Illustrative selections for this demonstration.</p><div className="profile-links"><Link href="/players/virat-kohli">Virat Kohli</Link><Link href="/players/jasprit-bumrah">Jasprit Bumrah</Link><Link href="/players/pat-cummins">Pat Cummins</Link></div></div>:selected==='Match Details'?<div className="content-box"><h2>Match details</h2><p><b>Series:</b> {match.tournament}</p><p><b>Venue:</b> {match.venue}</p><p><b>Format:</b> {match.format}</p><p><b>Scheduled:</b> {formatDate(match.date)}</p></div>:<><div className="content-box"><h2>{selected==='Summary'?'Match summary':'Batting scorecard'}</h2><p>{featured?'Current run rate: 3.62 · Partnership: 112 runs · Last wicket: Shubman Gill 54':'Detailed scorecard data is not available for this demo match.'}</p>{featured&&<p>Fall of wickets: 1–68, 2–91, 3–172, 4–198.</p>}</div>{featured&&<ScoreTable rows={rows}/>}</>}<JsonLd value={{'@context':'https://schema.org','@type':'SportsEvent',name:`${match.team1.name} vs ${match.team2.name}`,startDate:match.date,location:{'@type':'Place',name:match.venue},competitor:[{'@type':'SportsTeam',name:match.team1.name},{'@type':'SportsTeam',name:match.team2.name}],description:match.note}}/></>}
-export default async function DynamicPage({params,searchParams}:Props){const {slug}=await params;const query=await searchParams;const path=slug.join('/');const info=await identify(slug);if(!info)notFound();const [articles,matches,tournaments,videos,teams,players]=await Promise.all([newsService.list(),matchService.list(),tournamentService.list(),videoService.list(),teamService.list(),playerService.list()]);let content:React.ReactNode;
-if(path==='cricket/live-scores'||path==='cricket/fixtures'){const filter=val(query.filter)||'all';const filtered=matches.filter(m=>filter==='all'||m.status===filter||m.category.toLowerCase()===filter).filter(m=>!val(query.team)||`${m.team1.name} ${m.team2.name}`.toLowerCase().includes(val(query.team).toLowerCase())).filter(m=>!val(query.tournament)||m.tournament.toLowerCase().includes(val(query.tournament).toLowerCase())).filter(m=>!val(query.date)||m.date.startsWith(val(query.date)));content=<><Crumbs items={[{label:info.title}]}/><PageHeader kicker="FOLLOW THE ACTION" title={info.title} description="Follow the action from around the cricket world. Scores and fixtures shown here are demonstration data."/><Filters base={`/${path}`} current={filter} items={['All','Live','Upcoming','Recent','International','Domestic','League']}/><form className="filter-nav" action={`/${path}`}><label>Team <input name="team" defaultValue={val(query.team)} placeholder="e.g. India"/></label><label>Tournament <input name="tournament" defaultValue={val(query.tournament)} placeholder="e.g. World Test"/></label><label>Date <input type="date" name="date" defaultValue={val(query.date)}/></label><button>Apply filters</button></form><div className="listing-grid">{filtered.map(m=><MatchCard key={m.slug} match={m}/>)}</div>{!filtered.length&&<div className="empty">No matches found for these filters. Try another selection.</div>}<div style={{marginTop:30}}><Link className="text-link" href={path==='cricket/fixtures'?'/cricket/live-scores':'/cricket/fixtures'}>{path==='cricket/fixtures'?'VIEW LIVE SCORES':'VIEW FIXTURES & RESULTS'} <ArrowRight size={15}/></Link></div></>}
-else if(slug[0]==='cricket'&&slug[1]==='match'){const m=await matchService.get(slug[2]);if(!m)notFound();content=<MatchPage match={m} tab={val(query.tab)}/>}
-else if(path==='cricket/series'){content=<><Crumbs items={[{label:'Series & Tournaments'}]}/><PageHeader kicker="THE BIG STAGE" title="Series & tournaments" description="Follow the competitions, teams and stories that matter."/><div className="tournament-grid">{tournaments.map((t,i)=><Link href={`/cricket/series/${t.slug}`} className={`tournament-card tournament-${i}`} key={t.slug}><span className="tournament-number">SERIES / {t.dates}</span><span className="tournament-symbol">✳</span><div><h3>{t.name}</h3><span className="tournament-link">EXPLORE SERIES <ArrowRight size={15}/></span></div></Link>)}</div></>}
-else if(slug[0]==='cricket'&&slug[1]==='series'&&slug.length===3){const t=await tournamentService.get(slug[2]);if(!t)notFound();const tab=val(query.filter)||'overview';content=<><Crumbs items={[{label:'Series',href:'/cricket/series'},{label:t.name}]}/><PageHeader kicker={t.dates} title={t.name} description={t.description}/><Filters base={`/cricket/series/${t.slug}`} current={tab} items={['Overview','Matches','Points Table','Teams','Squads','Top Scorers','Top Wickets','News']}/>{tab==='points table'?<Points/>:tab==='matches'?<div className="listing-grid">{matches.filter(m=>m.tournament===t.name).map(m=><MatchCard key={m.slug} match={m}/>)}</div>:tab==='teams'||tab==='squads'?<div className="profile-links">{teams.filter(team=>t.teams.includes(team.slug)).map(team=><Link href={`/teams/${team.slug}`} key={team.slug}>{team.flag} {team.name}</Link>)}</div>:tab==='news'?<div className="article-grid">{articles.slice(0,3).map(a=><ArticleCard article={a} key={a.slug}/>)}</div>:tab==='top scorers'||tab==='top wickets'?<div className="content-box"><h2>{tab==='top scorers'?'Top run scorers':'Top wicket takers'}</h2><p>Statistics are illustrative for this demo.</p><div className="profile-links">{players.map(p=><Link href={`/players/${p.slug}`} key={p.slug}>{p.name} · {p.country}</Link>)}</div></div>:<><div className="content-box"><h2>About the competition</h2><p>{t.description}</p><p>{t.dates} · {t.teams.length} featured teams</p></div><div className="section-block"><SectionHeading title="Teams"/><div className="profile-links">{teams.filter(team=>t.teams.includes(team.slug)).map(team=><Link href={`/teams/${team.slug}`} key={team.slug}>{team.flag} {team.name}</Link>)}</div></div></>}</>}
-else if(path==='news'||path==='news/latest'||path==='news/trending'||path==='news/featured'||(slug[0]==='cricket'&&slug[1]==='news')){const filter=val(query.filter)||'all';const list=filter==='all'?articles:articles.filter(a=>a.category.toLowerCase().includes(filter));content=<><Crumbs items={[{label:info.title}]}/><PageHeader kicker="THE STORIES THAT MATTER" title={info.title} description="Original perspectives, insight and stories from across the game."/><Filters base="/news" current={filter} items={['All','Test Cricket','Analysis','India Cricket','Football','Other Sports','Culture']}/><div className="page-grid"><div className="article-grid">{list.map(a=><ArticleCard article={a} key={a.slug}/>)}</div><Trending articles={articles}/></div>{!list.length&&<div className="empty">No stories in this category yet.</div>}</>}
-else if(slug[0]==='news'&&slug.length===2){const a=await newsService.get(slug[1]);if(!a)notFound();content=<><Crumbs items={[{label:'News',href:'/news'},{label:a.title}]}/><div className="page-grid"><article className="article-detail"><span className="eyebrow">{a.category}</span><h1>{a.title}</h1><p className="article-deck">{a.excerpt}</p><div className="byline"><b>BY {a.author.toUpperCase()}</b><span>Published {formatDate(a.published)}</span><span>Updated {formatDate(a.updated)}</span><span>{a.readTime} min read</span></div><div className="article-cover"><Image src={a.image} alt={a.imageAlt} fill priority sizes="(max-width: 800px) 100vw, 800px"/></div><div className="article-body">{a.body.map(p=><p key={p}>{p}</p>)}</div><div className="share-row"><span>SHARE THIS STORY</span><a href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(a.title)}&url=${encodeURIComponent(site.url+'/news/'+a.slug)}`} target="_blank" rel="noopener noreferrer">X / TWITTER ↗</a><a href={`mailto:?subject=${encodeURIComponent(a.title)}&body=${encodeURIComponent(site.url+'/news/'+a.slug)}`}>EMAIL ↗</a></div></article><Trending articles={articles.filter(x=>x.slug!==a.slug)}/></div><div className="section-block"><SectionHeading title="More stories" href="/news"/><div className="article-grid">{articles.filter(x=>x.slug!==a.slug).slice(0,3).map(x=><ArticleCard article={x} key={x.slug}/>)}</div></div><JsonLd value={{'@context':'https://schema.org','@type':'NewsArticle',headline:a.title,description:a.excerpt,image:site.url+a.image,datePublished:a.published,dateModified:a.updated,author:{'@type':'Person',name:a.author},publisher:{'@type':'Organization',name:site.name},mainEntityOfPage:site.url+'/news/'+a.slug}}/></>}
-else if(path==='videos'){const filter=val(query.filter)||'all';const videoList=filter==='all'?videos:videos.filter(v=>v.category.toLowerCase().includes(filter));content=<><Crumbs items={[{label:'Videos'}]}/><PageHeader kicker="WATCH THE GAME DIFFERENTLY" title="The Boundary in motion" description="Highlights, interviews and analysis from around the game. Video playback is not connected in this demo."/><Filters base="/videos" current={filter} items={['All','Match Highlights','The Breakdown','Feature']}/><div className="video-grid">{videoList.map(v=><VideoCard video={v} key={v.slug}/>)}</div>{!videoList.length&&<div className="empty">No videos found in this category.</div>}</>}
-else if(slug[0]==='videos'&&slug.length===2){const v=await videoService.get(slug[1]);if(!v)notFound();content=<><Crumbs items={[{label:'Videos',href:'/videos'},{label:v.title}]}/><PageHeader kicker={v.category} title={v.title} description={v.description}/><div className="video-placeholder"><div><Play size={40}/><h2>Video preview</h2><p>Playback is not available in this frontend demonstration.</p></div></div><div className="section-block"><SectionHeading title="More to watch" href="/videos"/><div className="video-grid">{videos.filter(x=>x.slug!==v.slug).map(x=><VideoCard video={x} key={x.slug}/>)}</div></div><JsonLd value={{'@context':'https://schema.org','@type':'VideoObject',name:v.title,description:v.description,thumbnailUrl:site.url+v.image,uploadDate:v.published}}/></>}
-else if(path==='teams'){content=<><Crumbs items={[{label:'Teams'}]}/><PageHeader kicker="THE TEAMS" title="Teams around the world" description="Get to know the sides and players bringing the game to life."/><div className="listing-grid">{teams.map(t=><Link href={`/teams/${t.slug}`} className="content-box" key={t.slug}><span className="profile-flag">{t.flag}</span><h2>{t.name} <span className="accent">↗</span></h2><p>{t.description}</p></Link>)}</div></>}
-else if(slug[0]==='teams'&&slug.length===2){const t=await teamService.get(slug[1]);if(!t)notFound();content=<><Crumbs items={[{label:'Teams',href:'/teams'},{label:t.name}]}/><div className="profile-card"><span className="profile-flag">{t.flag}</span><div><span className="eyebrow">INTERNATIONAL CRICKET</span><h1>{t.name}</h1><p>{t.description}</p></div></div><SectionHeading title="Squad & players"/><div className="profile-links">{players.filter(p=>p.country===t.name).map(p=><Link href={`/players/${p.slug}`} key={p.slug}>{p.name} · {p.role}</Link>)}{!players.some(p=>p.country===t.name)&&<p>Player profiles for this team are not available in this demo.</p>}</div><div className="section-block"><SectionHeading title="Matches" href="/cricket/fixtures"/><div className="listing-grid">{matches.filter(m=>m.team1.slug===t.slug||m.team2.slug===t.slug).map(m=><MatchCard match={m} key={m.slug}/>)}</div></div><JsonLd value={{'@context':'https://schema.org','@type':'SportsTeam',name:t.name,description:t.description,url:site.url+'/teams/'+t.slug}}/></>}
-else if(slug[0]==='players'&&slug.length===2){const p=await playerService.get(slug[1]);if(!p)notFound();content=<><Crumbs items={[{label:'Teams',href:'/teams'},{label:p.name}]}/><div className="profile-card"><span className="profile-flag">🏏</span><div><span className="eyebrow">{p.country.toUpperCase()} / {p.role.toUpperCase()}</span><h1>{p.name}</h1><p>{p.description}</p></div></div><div className="content-box"><h2>Player profile</h2><p><b>Playing role:</b> {p.role}</p><p><b>Batting style:</b> {p.batting}</p><p><b>Bowling style:</b> {p.bowling}</p><p>Career statistics and recent performances will be available when a data provider is connected.</p><Link className="text-link" href={`/teams/${p.country.toLowerCase()}`}>VIEW TEAM <ArrowRight size={15}/></Link></div><div className="section-block"><SectionHeading title="Related stories" href="/news"/><div className="article-grid">{articles.slice(0,3).map(a=><ArticleCard key={a.slug} article={a}/>)}</div></div><JsonLd value={{'@context':'https://schema.org','@type':'Person',name:p.name,description:p.description,nationality:p.country}}/></>}
-else if(path==='rankings'){content=<><Crumbs items={[{label:'Rankings'}]}/><PageHeader kicker="THE TABLE" title="Cricket rankings" description="Illustrative championship standings, not official ICC rankings."/><Points/></>}
-else if(path==='search'){const q=val(query.q);const results=await searchAll(q);content=<><Crumbs items={[{label:'Search'}]}/><PageHeader kicker="FIND YOUR GAME" title="Search The Boundary" description="Search stories, teams, players, tournaments and matches."/><form className="search-form" action="/search"><label className="sr-only" htmlFor="q">Search</label><input id="q" name="q" type="search" list="search-suggestions" defaultValue={q} placeholder="Try India, Test cricket or Kohli"/><button>SEARCH</button><datalist id="search-suggestions">{[...teams.map(t=>t.name),...players.map(p=>p.name),...tournaments.map(t=>t.name),...articles.map(a=>a.title)].map(title=><option value={title} key={title}/>)}</datalist></form>{q?<><p>{results.length} {results.length===1?'result':'results'} for “{q}”</p>{results.length?results.map(r=><Link className="result" href={r.href} key={r.href}><span className="eyebrow">{r.type}</span><b>{r.title}</b></Link>):<div className="empty">No results found. Try a different search term.</div>}</>:<div className="empty">Start typing to explore the world of sport. Popular searches: <Link href="/search?q=India">India</Link> · <Link href="/search?q=Test">Test cricket</Link> · <Link href="/search?q=Kohli">Kohli</Link></div>}</>}
-else if(path==='cricket'){content=<><Crumbs items={[{label:'Cricket'}]}/><PageHeader kicker="YOUR FRONT ROW SEAT" title="Cricket" description="Everything you love about the game, in one place."/><div className="profile-links"><Link href="/cricket/live-scores">Live scores ↗</Link><Link href="/cricket/fixtures">Fixtures & results ↗</Link><Link href="/cricket/series">Series & tournaments ↗</Link><Link href="/teams">Teams ↗</Link><Link href="/rankings">Rankings ↗</Link></div><div className="section-block"><SectionHeading title="Around the grounds" href="/cricket/live-scores"/><div className="match-grid">{matches.slice(0,3).map(m=><MatchCard match={m} key={m.slug}/>)}</div></div><div className="section-block"><SectionHeading title="Latest cricket stories" href="/news"/><div className="article-grid">{articles.slice(0,3).map(a=><ArticleCard article={a} key={a.slug}/>)}</div></div></>}
-else {content=<><Crumbs items={[{label:info.title}]}/><PageHeader title={info.title}/><div className="content-box">{path==='about'?<><h2>For the love of the game.</h2><p>The Boundary is a demonstration sports media experience built around the stories, scores and moments that bring fans together. All content and scores are illustrative.</p></>:<><h2>Get in touch</h2><p>This is a frontend demonstration. A real editorial contact channel will be published when the platform launches.</p></>}</div></>}
-const breadcrumb={'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:[{'@type':'ListItem',position:1,name:'Home',item:site.url},{'@type':'ListItem',position:2,name:info.title,item:site.url+'/'+path}]};return <div className="shell page">{content}<JsonLd value={breadcrumb}/></div>;
+import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowRight, Play } from "lucide-react";
+import {
+  ArticleCard,
+  MatchCard,
+  Points,
+  SectionHeading,
+  VideoCard,
+} from "@/components/cards";
+import {
+  matchService,
+  newsService,
+  playerService,
+  tournamentService,
+  videoService,
+  teamService,
+  matchDetailsService,
+  searchAll,
+  rankingsService,
+} from "@/services";
+import { ServiceError } from "@/lib/api";
+import {
+  externalUrl,
+  mediaUrl,
+  renderArticleBody,
+  safePath,
+} from "@/lib/content";
+import { formatDate } from "@/lib/utils";
+import { site } from "@/config/site";
+import type { Innings, NewsArticle, PaginatedResponse } from "@/types";
+type Props = {
+  params: Promise<{ slug: string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+const val = (v: string | string[] | undefined) =>
+  typeof v === "string" ? v : "";
+const titles: Record<string, string> = {
+  cricket: "Cricket",
+  "cricket/live-scores": "Live Cricket Scores",
+  "cricket/fixtures": "Fixtures & Results",
+  "cricket/series": "Series & Tournaments",
+  news: "Latest Sports News",
+  "news/latest": "Latest News",
+  "news/trending": "Trending Stories",
+  "news/featured": "Featured Stories",
+  "news/categories": "News Categories",
+  videos: "Cricket Videos",
+  teams: "Cricket Teams",
+  rankings: "Cricket Rankings",
+  search: "Search",
+  about: "About The Boundary",
+  contact: "Contact",
+};
+const pageNumber = (s: string) =>
+  /^\d+$/.test(s) ? Math.min(Number(s), 100000) : 0;
+function absolute(url: string) {
+  try {
+    return new URL(url, site.url).toString();
+  } catch {
+    return site.url;
+  }
+}
+async function identify(slug: string[]) {
+  const path = slug.join("/");
+  if (titles[path])
+    return {
+      title: titles[path],
+      description: `${titles[path]} from The Boundary. Scores, stories and moments for the love of the game.`,
+    };
+  if (slug[0] === "cricket" && slug[1] === "news" && slug.length === 3)
+    return {
+      title: "Cricket News",
+      description: "The latest cricket stories and analysis.",
+    };
+  if (slug[0] === "news" && slug.length === 2) {
+    const a = await newsService.get(slug[1]);
+    return a
+      ? {
+          title: a.seo?.metaTitle || a.title,
+          description: a.seo?.metaDescription || a.excerpt,
+          image: a.seo?.ogImageUrl || a.image,
+          canonical: a.seo?.canonicalUrl || a.path,
+          robots: a.seo?.robots,
+          ogTitle: a.seo?.ogTitle,
+          ogDescription: a.seo?.ogDescription,
+        }
+      : null;
+  }
+  if (slug[0] === "cricket" && slug[1] === "match" && slug.length === 3) {
+    const m = await matchService.get(slug[2]);
+    return m
+      ? {
+          title: `${m.team1.name} vs ${m.team2.name} | Match Centre`,
+          description: `${m.tournament} match centre, scorecard and details.`,
+        }
+      : null;
+  }
+  if (slug[0] === "cricket" && slug[1] === "series" && slug.length === 3) {
+    const t = await tournamentService.get(slug[2]);
+    return t ? { title: t.name, description: t.description } : null;
+  }
+  if (slug[0] === "teams" && slug.length === 2) {
+    const t = await teamService.get(slug[1]);
+    return t
+      ? { title: `${t.name} Cricket Team`, description: t.description }
+      : null;
+  }
+  if (slug[0] === "players" && slug.length === 2) {
+    const p = await playerService.get(slug[1]);
+    return p ? { title: p.name, description: p.description } : null;
+  }
+  if (slug[0] === "videos" && slug.length === 2) {
+    const v = await videoService.get(slug[1]);
+    return v
+      ? { title: v.title, description: v.description, image: v.image }
+      : null;
+  }
+  return null;
+}
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const info = await identify(slug);
+  if (!info) return { title: "Not found" };
+  const canonical = info.canonical || `/${slug.join("/")}`;
+  return {
+    title: info.title,
+    description: info.description,
+    alternates: { canonical },
+    robots:
+      slug[0] === "search"
+        ? { index: false, follow: true }
+        : info.robots || undefined,
+    openGraph: {
+      title: info.ogTitle || info.title,
+      description: info.ogDescription || info.description,
+      url: canonical,
+      images: info.image ? [absolute(info.image)] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: info.title,
+      description: info.description,
+      images: info.image ? [absolute(info.image)] : undefined,
+    },
+  };
+}
+function Crumbs({ items }: { items: { label: string; href?: string }[] }) {
+  return (
+    <nav className="breadcrumbs" aria-label="Breadcrumb">
+      <Link href="/">Home</Link>
+      {items.map((x, i) => (
+        <span key={i}>
+          {" "}
+          / &nbsp; {x.href ? <Link href={x.href}>{x.label}</Link> : x.label}
+        </span>
+      ))}
+    </nav>
+  );
+}
+function JsonLd({ value }: { value: object }) {
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(value).replace(/</g, "\\u003c"),
+      }}
+    />
+  );
+}
+function PageHeader({
+  kicker = "THE BOUNDARY",
+  title,
+  description,
+}: {
+  kicker?: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="page-header">
+      <span className="eyebrow">{kicker}</span>
+      <h1>
+        {title}
+        <span className="accent">.</span>
+      </h1>
+      {description && <p>{description}</p>}
+    </div>
+  );
+}
+function Trending({ articles }: { articles: NewsArticle[] }) {
+  return (
+    <aside className="sidebar">
+      <span className="eyebrow">MORE FROM THE BOUNDARY</span>
+      <h2>
+        Latest stories<span className="accent">.</span>
+      </h2>
+      {articles.map((a, i) => (
+        <Link key={a.slug} href={safePath(a.path, `/news/${a.slug}`)}>
+          <span className="accent">0{i + 1} &nbsp; </span>
+          {a.title}
+        </Link>
+      ))}
+    </aside>
+  );
+}
+function Filters({
+  base,
+  items,
+  current,
+}: {
+  base: string;
+  items: { label: string; value: string }[];
+  current: string;
+}) {
+  return (
+    <nav className="filter-nav" aria-label="Filter content">
+      {items.map((i) => (
+        <Link
+          className={current === i.value ? "selected" : ""}
+          key={i.value}
+          href={`${base}${i.value === "all" && base !== "/cricket/live-scores" && base !== "/cricket/fixtures" ? "" : `?filter=${encodeURIComponent(i.value)}`}`}
+        >
+          {i.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+function Pagination<T>({
+  data,
+  base,
+  params,
+}: {
+  data: PaginatedResponse<T>;
+  base: string;
+  params: Record<string, string>;
+}) {
+  function url(p: number) {
+    const q = new URLSearchParams({ ...params, page: String(p) });
+    for (const [k, v] of q.entries()) if (!v) q.delete(k);
+    return `${base}?${q}`;
+  }
+  return data.totalPages > 1 ? (
+    <nav className="filter-nav" aria-label="Pagination">
+      {!data.first && <Link href={url(data.page - 1)}>← Previous</Link>}
+      <span>
+        Page {data.page + 1} of {data.totalPages}
+      </span>
+      {!data.last && <Link href={url(data.page + 1)}>Next →</Link>}
+    </nav>
+  ) : null;
+}
+function ScoreTables({ innings }: { innings: Innings[] }) {
+  return innings.length ? (
+    <>
+      {innings.map((i) => (
+        <section className="section-block" key={i.inningsNumber}>
+          <h2>
+            {i.battingTeam.name} · {i.runs}/{i.wickets} ({i.overs}){" "}
+            {i.declared ? "declared" : ""}
+          </h2>
+          <div className="data-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Batter</th>
+                  <th>Dismissal</th>
+                  <th>R</th>
+                  <th>B</th>
+                  <th>4s</th>
+                  <th>6s</th>
+                </tr>
+              </thead>
+              <tbody>
+                {i.batting.map((b, n) => (
+                  <tr key={`${b.batter}-${n}`}>
+                    <td>{b.batter}</td>
+                    <td>{b.dismissal || (b.notOut ? "not out" : "—")}</td>
+                    <td>{b.runs}</td>
+                    <td>{b.balls}</td>
+                    <td>{b.fours}</td>
+                    <td>{b.sixes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="data-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bowler</th>
+                  <th>Overs</th>
+                  <th>Maidens</th>
+                  <th>Runs</th>
+                  <th>Wickets</th>
+                  <th>Economy</th>
+                </tr>
+              </thead>
+              <tbody>
+                {i.bowling.map((b, n) => (
+                  <tr key={`${b.bowler}-${n}`}>
+                    <td>{b.bowler}</td>
+                    <td>{b.overs}</td>
+                    <td>{b.maidens}</td>
+                    <td>{b.runsConceded}</td>
+                    <td>{b.wickets}</td>
+                    <td>{b.economy}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
+    </>
+  ) : (
+    <div className="empty">No scorecard available yet.</div>
+  );
+}
+async function MatchPage({
+  slug,
+  tab,
+  page,
+}: {
+  slug: string;
+  tab: string;
+  page: number;
+}) {
+  const m = await matchService.get(slug);
+  if (!m) notFound();
+  const tabs = [
+    "Summary",
+    "Live Commentary",
+    "Scorecard",
+    "Full Scorecard",
+    "Playing XI",
+    "Match Details",
+    "Points Table",
+  ];
+  const selected =
+    tabs.find((t) => t.toLowerCase().replaceAll(" ", "-") === tab) || "Summary";
+  let body: React.ReactNode;
+  if (selected === "Live Commentary") {
+    const c = await matchDetailsService.commentary(slug, page);
+    body = (
+      <div className="content-box">
+        <h2>Commentary</h2>
+        {c.content.length ? (
+          c.content.map((x, i) => (
+            <div className="commentary-item" key={`${x.createdAt}-${i}`}>
+              <strong>
+                {x.over} · {x.kind}
+              </strong>
+              {x.text}
+            </div>
+          ))
+        ) : (
+          <p>No commentary available yet.</p>
+        )}
+        <Pagination
+          data={c}
+          base={`/cricket/match/${slug}`}
+          params={{ tab: "live-commentary" }}
+        />
+      </div>
+    );
+  } else if (selected === "Scorecard" || selected === "Full Scorecard") {
+    body = <ScoreTables innings={await matchDetailsService.scorecard(slug)} />;
+  } else if (selected === "Points Table") {
+    body = m.tournamentSlug ? (
+      <Points rows={await tournamentService.points(m.tournamentSlug)} />
+    ) : (
+      <div className="empty">No tournament standings available.</div>
+    );
+  } else if (selected === "Playing XI") {
+    body = (
+      <div className="empty">
+        Playing XI is not available from the current API.
+      </div>
+    );
+  } else {
+    body = (
+      <div className="content-box">
+        <h2>{selected === "Summary" ? "Match summary" : "Match details"}</h2>
+        <p>
+          <b>Series:</b> {m.tournament || "—"}
+        </p>
+        <p>
+          <b>Venue:</b> {m.venue || "—"}
+        </p>
+        <p>
+          <b>Format:</b> {m.format || "—"}
+        </p>
+        <p>
+          <b>Scheduled:</b> {formatDate(m.date)}
+        </p>
+        <p>{m.note}</p>
+      </div>
+    );
+  }
+  return (
+    <>
+      <Crumbs
+        items={[
+          { label: "Live Scores", href: "/cricket/live-scores" },
+          { label: `${m.team1.name} vs ${m.team2.name}` },
+        ]}
+      />
+      <PageHeader
+        kicker={`${m.format} / ${m.tournament.toUpperCase()}`}
+        title={`${m.team1.name} vs ${m.team2.name}`}
+        description={`${m.venue} · ${formatDate(m.date)}`}
+      />
+      <div className="detail-score">
+        <span className="eyebrow">
+          {m.status === "live" ? "● LIVE" : m.state} &nbsp; / &nbsp; {m.format}
+        </span>
+        <div className="match-team">
+          <span>
+            {m.team1.flag} &nbsp;{m.team1.name}
+          </span>
+          <strong>{m.score1 || "—"}</strong>
+        </div>
+        <div className="match-team">
+          <span>
+            {m.team2.flag} &nbsp;{m.team2.name}
+          </span>
+          <strong>{m.score2 || "—"}</strong>
+        </div>
+        <div className="match-bottom">{m.note}</div>
+      </div>
+      <nav className="filter-nav" aria-label="Match centre tabs">
+        {tabs.map((t) => (
+          <Link
+            key={t}
+            className={selected === t ? "selected" : ""}
+            href={`/cricket/match/${slug}?tab=${t.toLowerCase().replaceAll(" ", "-")}`}
+          >
+            {t}
+          </Link>
+        ))}
+      </nav>
+      {body}
+      <JsonLd
+        value={{
+          "@context": "https://schema.org",
+          "@type": "SportsEvent",
+          name: `${m.team1.name} vs ${m.team2.name}`,
+          startDate: m.date,
+          location: { "@type": "Place", name: m.venue },
+          competitor: [
+            { "@type": "SportsTeam", name: m.team1.name },
+            { "@type": "SportsTeam", name: m.team2.name },
+          ],
+          description: m.note,
+        }}
+      />
+    </>
+  );
+}
+export default async function DynamicPage({ params, searchParams }: Props) {
+  const { slug } = await params;
+  const q = await searchParams;
+  const path = slug.join("/");
+  const info = await identify(slug);
+  if (!info) notFound();
+  let content: React.ReactNode;
+  if (path === "cricket/live-scores" || path === "cricket/fixtures") {
+    const filter =
+      val(q.filter) || (path === "cricket/live-scores" ? "live" : "upcoming");
+    const team = val(q.team),
+      tournament = val(q.tournament),
+      date = val(q.date),
+      from = val(q.from),
+      to = val(q.to);
+    let data: Awaited<ReturnType<typeof matchService.list>> | undefined;
+    let filterError = "";
+    try {
+      data = await matchService.list({
+        filter,
+        team,
+        tournament,
+        date,
+        from,
+        to,
+        page: pageNumber(val(q.page)),
+      });
+    } catch (error) {
+      if (
+        error instanceof ServiceError &&
+        error.status === 400 &&
+        (error.code === "invalid_date" || error.code === "invalid_date_range")
+      ) {
+        filterError =
+          "Please use valid dates. Choose a single date or an inclusive date range, and ensure the start is not after the end.";
+      } else {
+        throw error;
+      }
+    }
+    content = (
+      <>
+        <Crumbs items={[{ label: info.title }]} />
+        <PageHeader
+          kicker="FOLLOW THE ACTION"
+          title={info.title}
+          description="Follow the action from around the cricket world."
+        />
+        <Filters
+          base={`/${path}`}
+          current={filter}
+          items={[
+            "all",
+            "live",
+            "upcoming",
+            "recent",
+            "international",
+            "domestic",
+            "league",
+          ].map((x) => ({ label: x[0].toUpperCase() + x.slice(1), value: x }))}
+        />
+        <form className="filter-nav" action={`/${path}`}>
+          <input type="hidden" name="filter" value={filter} />
+          <label>
+            Team slug <input name="team" defaultValue={team} />
+          </label>
+          <label>
+            Tournament slug{" "}
+            <input name="tournament" defaultValue={tournament} />
+          </label>
+          <label>
+            Date <input type="date" name="date" defaultValue={date} />
+          </label>
+          <label>
+            From (UTC) <input type="date" name="from" defaultValue={from} />
+          </label>
+          <label>
+            To (UTC) <input type="date" name="to" defaultValue={to} />
+          </label>
+          <button>Apply filters</button>
+        </form>
+        {filterError && (
+          <div className="empty" role="alert">
+            {filterError}
+          </div>
+        )}
+        <div className="listing-grid">
+          {data?.content.map((m) => (
+            <MatchCard key={m.slug} match={m} />
+          ))}
+        </div>
+        {data && !data.content.length && (
+          <div className="empty">No matches found for these filters.</div>
+        )}
+        {data && (
+          <Pagination
+            data={data}
+            base={`/${path}`}
+            params={{ filter, team, tournament, date, from, to }}
+          />
+        )}
+        <div style={{ marginTop: 30 }}>
+          <Link
+            className="text-link"
+            href={
+              path === "cricket/fixtures"
+                ? "/cricket/live-scores"
+                : "/cricket/fixtures"
+            }
+          >
+            {path === "cricket/fixtures"
+              ? "VIEW LIVE SCORES"
+              : "VIEW FIXTURES & RESULTS"}{" "}
+            <ArrowRight size={15} />
+          </Link>
+        </div>
+      </>
+    );
+  } else if (slug[0] === "cricket" && slug[1] === "match" && slug.length === 3)
+    content = (
+      <MatchPage
+        slug={slug[2]}
+        tab={val(q.tab)}
+        page={pageNumber(val(q.page))}
+      />
+    );
+  else if (path === "cricket/series") {
+    const series = await tournamentService.list();
+    content = (
+      <>
+        <Crumbs items={[{ label: info.title }]} />
+        <PageHeader
+          kicker="THE BIG STAGE"
+          title="Series & tournaments"
+          description="Follow the competitions, teams and stories that matter."
+        />
+        <div className="tournament-grid">
+          {series.map((t, i) => (
+            <Link
+              href={`/cricket/series/${t.slug}`}
+              className={`tournament-card tournament-${i % 3}`}
+              key={t.slug}
+            >
+              <span className="tournament-number">SERIES / {t.dates}</span>
+              <span className="tournament-symbol">✳</span>
+              <div>
+                <h3>{t.name}</h3>
+                <span className="tournament-link">
+                  EXPLORE SERIES <ArrowRight size={15} />
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+        {!series.length && (
+          <div className="empty">No series available yet.</div>
+        )}
+      </>
+    );
+  } else if (
+    slug[0] === "cricket" &&
+    slug[1] === "series" &&
+    slug.length === 3
+  ) {
+    const t = await tournamentService.get(slug[2]);
+    if (!t) notFound();
+    const tab = val(q.filter) || "overview";
+    const tabs = [
+      "Overview",
+      "Matches",
+      "Points Table",
+      "Teams",
+      "Squads",
+      "Top Scorers",
+      "Top Wickets",
+      "News",
+    ];
+    let body: React.ReactNode;
+    if (tab === "points table" || tab === "points-table")
+      body = <Points rows={await tournamentService.points(t.slug)} />;
+    else if (tab === "matches") {
+      const matches = await matchService.list({ tournament: t.slug });
+      body = (
+        <div className="listing-grid">
+          {matches.content.map((m) => (
+            <MatchCard key={m.slug} match={m} />
+          ))}
+        </div>
+      );
+    } else if (tab === "teams" || tab === "squads") {
+      const teams = (
+        await Promise.all(t.teams.map((slug) => teamService.get(slug)))
+      ).filter((team): team is NonNullable<typeof team> => !!team);
+      body = (
+        <div className="profile-links">
+          {teams.map((team) => (
+            <Link href={`/teams/${team.slug}`} key={team.slug}>
+              {team.flag} {team.name}
+            </Link>
+          ))}
+        </div>
+      );
+    } else if (tab === "news") {
+      const articles = (await newsService.list()).content;
+      body = (
+        <div className="article-grid">
+          {articles.map((a) => (
+            <ArticleCard article={a} key={a.slug} />
+          ))}
+        </div>
+      );
+    } else if (tab === "top scorers" || tab === "top wickets")
+      body = (
+        <div className="empty">
+          Statistics are not available from the current API.
+        </div>
+      );
+    else
+      body = (
+        <div className="content-box">
+          <h2>About the competition</h2>
+          <p>{t.description}</p>
+          <p>
+            {t.dates} · {t.teams.length} teams
+          </p>
+        </div>
+      );
+    content = (
+      <>
+        <Crumbs
+          items={[
+            { label: "Series", href: "/cricket/series" },
+            { label: t.name },
+          ]}
+        />
+        <PageHeader
+          kicker={t.dates}
+          title={t.name}
+          description={t.description}
+        />
+        <Filters
+          base={`/cricket/series/${t.slug}`}
+          current={tab}
+          items={tabs.map((x) => ({ label: x, value: x.toLowerCase() }))}
+        />
+        {body}
+      </>
+    );
+  } else if (path === "news/categories") {
+    const categories = await newsService.categories();
+    content = (
+      <>
+        <Crumbs
+          items={[{ label: "News", href: "/news" }, { label: "Categories" }]}
+        />
+        <PageHeader title="News categories" />
+        <div className="profile-links">
+          {categories.map((c) => (
+            <Link
+              href={`/news?filter=${encodeURIComponent(c.slug)}`}
+              key={c.slug}
+            >
+              {c.name}
+            </Link>
+          ))}
+        </div>
+        {!categories.length && (
+          <div className="empty">No categories available.</div>
+        )}
+      </>
+    );
+  } else if (
+    path === "news" ||
+    path === "news/latest" ||
+    path === "news/trending" ||
+    path === "news/featured" ||
+    (slug[0] === "cricket" && slug[1] === "news")
+  ) {
+    const filter = val(q.filter) || "all";
+    const categories = await newsService.categories();
+    const data =
+      path === "news/latest" || path === "news/featured"
+        ? null
+        : await newsService.list({
+            category: filter === "all" ? undefined : filter,
+            page: pageNumber(val(q.page)),
+          });
+    const list =
+      data?.content ?? (await newsService.latest(path === "news/featured", 12));
+    content = (
+      <>
+        <Crumbs items={[{ label: info.title }]} />
+        <PageHeader
+          kicker="THE STORIES THAT MATTER"
+          title={info.title}
+          description="Perspectives, insight and stories from across the game."
+        />
+        <Filters
+          base="/news"
+          current={filter}
+          items={[
+            { label: "All", value: "all" },
+            ...categories.map((c) => ({ label: c.name, value: c.slug })),
+          ]}
+        />
+        {path === "news/trending" && (
+          <p>
+            Trending data is not currently available; showing latest stories.
+          </p>
+        )}
+        <div className="page-grid">
+          <div className="article-grid">
+            {list.map((a) => (
+              <ArticleCard article={a} key={a.slug} />
+            ))}
+          </div>
+          <Trending articles={list.slice(0, 4)} />
+        </div>
+        {!list.length && (
+          <div className="empty">No stories in this category yet.</div>
+        )}
+        {data && (
+          <Pagination data={data} base={`/${path}`} params={{ filter }} />
+        )}
+      </>
+    );
+  } else if (slug[0] === "news" && slug.length === 2) {
+    const a = await newsService.get(slug[1]);
+    if (!a) notFound();
+    const related = (await newsService.latest(false, 4)).filter(
+      (x) => x.slug !== a.slug,
+    );
+    const image = mediaUrl(a.image);
+    const canonical = a.seo?.canonicalUrl || absolute(a.path);
+    content = (
+      <>
+        <Crumbs
+          items={[{ label: "News", href: "/news" }, { label: a.title }]}
+        />
+        <div className="page-grid">
+          <article className="article-detail">
+            <span className="eyebrow">{a.category}</span>
+            <h1>{a.title}</h1>
+            <p className="article-deck">{a.excerpt}</p>
+            <div className="byline">
+              <b>BY {a.author.toUpperCase()}</b>
+              <span>Published {formatDate(a.published)}</span>
+              <span>Updated {formatDate(a.updated)}</span>
+              <span>{a.readTime} min read</span>
+            </div>
+            {image && (
+              <div className="article-cover">
+                <Image
+                  src={image}
+                  alt={a.imageAlt}
+                  fill
+                  priority
+                  unoptimized
+                  sizes="(max-width: 800px) 100vw, 800px"
+                />
+              </div>
+            )}
+            <div
+              className="article-body"
+              dangerouslySetInnerHTML={{ __html: renderArticleBody(a) }}
+            />
+            <div className="share-row">
+              <span>SHARE THIS STORY</span>
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(a.title)}&url=${encodeURIComponent(canonical)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                X / TWITTER ↗
+              </a>
+              <a
+                href={`mailto:?subject=${encodeURIComponent(a.title)}&body=${encodeURIComponent(canonical)}`}
+              >
+                EMAIL ↗
+              </a>
+            </div>
+          </article>
+          <Trending articles={related} />
+        </div>
+        <div className="section-block">
+          <SectionHeading title="More stories" href="/news" />
+          <div className="article-grid">
+            {related.map((x) => (
+              <ArticleCard article={x} key={x.slug} />
+            ))}
+          </div>
+        </div>
+        <JsonLd
+          value={{
+            "@context": "https://schema.org",
+            "@type": "NewsArticle",
+            headline: a.title,
+            description: a.excerpt,
+            ...(image ? { image: absolute(image) } : {}),
+            datePublished: a.published,
+            dateModified: a.updated,
+            ...(a.author
+              ? { author: { "@type": "Person", name: a.author } }
+              : {}),
+            publisher: { "@type": "Organization", name: site.name },
+            mainEntityOfPage: canonical,
+          }}
+        />
+      </>
+    );
+  } else if (path === "videos") {
+    const filter = val(q.filter) || "all";
+    const data = await videoService.list({
+      filter: filter === "all" ? undefined : filter,
+      page: pageNumber(val(q.page)),
+    });
+    content = (
+      <>
+        <Crumbs items={[{ label: "Videos" }]} />
+        <PageHeader
+          kicker="WATCH THE GAME DIFFERENTLY"
+          title="The Boundary in motion"
+          description="Highlights, interviews and analysis from around the game."
+        />
+        <form action="/videos" className="filter-nav">
+          <label>
+            Category{" "}
+            <input
+              name="filter"
+              defaultValue={filter === "all" ? "" : filter}
+            />
+          </label>
+          <button>Filter</button>
+          <Link href="/videos">All</Link>
+        </form>
+        <div className="video-grid">
+          {data.content.map((v) => (
+            <VideoCard video={v} key={v.slug} />
+          ))}
+        </div>
+        {!data.content.length && <div className="empty">No videos found.</div>}
+        <Pagination data={data} base="/videos" params={{ filter }} />
+      </>
+    );
+  } else if (slug[0] === "videos" && slug.length === 2) {
+    const v = await videoService.get(slug[1]);
+    if (!v) notFound();
+    const url = externalUrl(v.videoUrl),
+      image = mediaUrl(v.image);
+    content = (
+      <>
+        <Crumbs
+          items={[{ label: "Videos", href: "/videos" }, { label: v.title }]}
+        />
+        <PageHeader
+          kicker={v.category}
+          title={v.title}
+          description={v.description}
+        />
+        <div className="video-placeholder">
+          <div>
+            <Play size={40} />
+            <h2>Watch this video</h2>
+            {url ? (
+              <a
+                className="dark-button"
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                OPEN VIDEO ↗
+              </a>
+            ) : (
+              <p>Video source is not available.</p>
+            )}
+          </div>
+        </div>
+        <JsonLd
+          value={{
+            "@context": "https://schema.org",
+            "@type": "VideoObject",
+            name: v.title,
+            description: v.description,
+            ...(image ? { thumbnailUrl: absolute(image) } : {}),
+            uploadDate: v.published,
+            ...(url ? { contentUrl: url } : {}),
+          }}
+        />
+      </>
+    );
+  } else if (path === "teams") {
+    const data = await teamService.list({ page: pageNumber(val(q.page)) });
+    content = (
+      <>
+        <Crumbs items={[{ label: "Teams" }]} />
+        <PageHeader
+          kicker="THE TEAMS"
+          title="Teams around the world"
+          description="Get to know the sides and players bringing the game to life."
+        />
+        <div className="listing-grid">
+          {data.content.map((t) => (
+            <Link
+              href={`/teams/${t.slug}`}
+              className="content-box"
+              key={t.slug}
+            >
+              {mediaUrl(t.logoUrl || "") ? (
+                <Image
+                  src={mediaUrl(t.logoUrl || "")!}
+                  alt={`${t.name} team logo`}
+                  width={64}
+                  height={64}
+                  unoptimized
+                  style={{ objectFit: "contain" }}
+                />
+              ) : (
+                <span className="profile-flag">{t.flag}</span>
+              )}
+              <h2>
+                {t.name} <span className="accent">↗</span>
+              </h2>
+              <p>{t.description}</p>
+            </Link>
+          ))}
+        </div>
+        {!data.content.length && (
+          <div className="empty">No teams available yet.</div>
+        )}
+        <Pagination data={data} base="/teams" params={{}} />
+      </>
+    );
+  } else if (slug[0] === "teams" && slug.length === 2) {
+    const t = await teamService.get(slug[1]);
+    if (!t) notFound();
+    const [players, matches] = await Promise.all([
+      playerService.list({ team: t.slug }),
+      matchService.list({ team: t.slug }),
+    ]);
+    content = (
+      <>
+        <Crumbs
+          items={[{ label: "Teams", href: "/teams" }, { label: t.name }]}
+        />
+        <div className="profile-card">
+          {mediaUrl(t.logoUrl || "") ? (
+            <Image
+              src={mediaUrl(t.logoUrl || "")!}
+              alt={`${t.name} team logo`}
+              width={64}
+              height={64}
+              unoptimized
+              style={{ objectFit: "contain" }}
+            />
+          ) : (
+            <span className="profile-flag">{t.flag}</span>
+          )}
+          <div>
+            <span className="eyebrow">CRICKET TEAM</span>
+            <h1>{t.name}</h1>
+            <p>{t.description}</p>
+          </div>
+        </div>
+        <SectionHeading title="Squad & players" />
+        <div className="profile-links">
+          {players.content.map((p) => (
+            <Link href={`/players/${p.slug}`} key={p.slug}>
+              {p.name} · {p.role}
+            </Link>
+          ))}
+          {!players.content.length && <p>No players available yet.</p>}
+        </div>
+        <div className="section-block">
+          <SectionHeading title="Matches" href="/cricket/fixtures" />
+          <div className="listing-grid">
+            {matches.content.map((m) => (
+              <MatchCard match={m} key={m.slug} />
+            ))}
+          </div>
+          {!matches.content.length && (
+            <div className="empty">No matches available yet.</div>
+          )}
+        </div>
+        <JsonLd
+          value={{
+            "@context": "https://schema.org",
+            "@type": "SportsTeam",
+            name: t.name,
+            description: t.description,
+            url: site.url + "/teams/" + t.slug,
+          }}
+        />
+      </>
+    );
+  } else if (slug[0] === "players" && slug.length === 2) {
+    const p = await playerService.get(slug[1]);
+    if (!p) notFound();
+    content = (
+      <>
+        <Crumbs
+          items={[{ label: "Teams", href: "/teams" }, { label: p.name }]}
+        />
+        <div className="profile-card">
+          {mediaUrl(p.imageUrl || "") ? (
+            <Image
+              src={mediaUrl(p.imageUrl || "")!}
+              alt={p.name}
+              width={80}
+              height={80}
+              unoptimized
+              style={{ objectFit: "cover" }}
+            />
+          ) : (
+            <span className="profile-flag">🏏</span>
+          )}
+          <div>
+            <span className="eyebrow">
+              {p.country.toUpperCase()} / {p.role.toUpperCase()}
+            </span>
+            <h1>{p.name}</h1>
+            <p>{p.description}</p>
+          </div>
+        </div>
+        <div className="content-box">
+          <h2>Player profile</h2>
+          <p>
+            <b>Playing role:</b> {p.role || "—"}
+          </p>
+          <p>
+            <b>Batting style:</b> {p.batting || "—"}
+          </p>
+          <p>
+            <b>Bowling style:</b> {p.bowling || "—"}
+          </p>
+          <p>Career statistics are not available from the current API.</p>
+          {p.teamSlug && (
+            <Link className="text-link" href={`/teams/${p.teamSlug}`}>
+              VIEW TEAM <ArrowRight size={15} />
+            </Link>
+          )}
+        </div>
+        <JsonLd
+          value={{
+            "@context": "https://schema.org",
+            "@type": "Person",
+            name: p.name,
+            description: p.description,
+          }}
+        />
+      </>
+    );
+  } else if (path === "rankings") {
+    const rankings = await rankingsService.get(val(q.format) || undefined);
+    content = (
+      <>
+        <Crumbs items={[{ label: "Rankings" }]} />
+        <PageHeader
+          kicker="THE TABLE"
+          title="Cricket rankings"
+          description={
+            rankings
+              ? `${rankings.tournamentName} standings`
+              : "No standings are currently available."
+          }
+        />
+        {rankings && <Points rows={rankings.rows} />}
+      </>
+    );
+  } else if (path === "search") {
+    const text = val(q.q).trim();
+    let result: Awaited<ReturnType<typeof searchAll>> | undefined;
+    let problem = "";
+    if (text)
+      try {
+        result = await searchAll(text);
+      } catch (error) {
+        if (error instanceof ServiceError && error.code === "query_too_short")
+          problem = "Please enter at least two characters.";
+        else if (error instanceof ServiceError && error.status === 429)
+          problem = "Too many requests. Please try again shortly.";
+        else throw error;
+      }
+    content = (
+      <>
+        <Crumbs items={[{ label: "Search" }]} />
+        <PageHeader
+          kicker="FIND YOUR GAME"
+          title="Search The Boundary"
+          description="Search stories, teams, players, tournaments and matches."
+        />
+        <form className="search-form" action="/search">
+          <label className="sr-only" htmlFor="q">
+            Search
+          </label>
+          <input
+            id="q"
+            name="q"
+            type="search"
+            defaultValue={text}
+            placeholder="Search sport"
+          />
+          <button>SEARCH</button>
+        </form>
+        {problem ? (
+          <div className="empty">{problem}</div>
+        ) : text && result ? (
+          <>
+            <p>
+              {result.total} results for “{text}”
+            </p>
+            {result.results.length ? (
+              result.results.map((r, i) => (
+                <Link
+                  className="result"
+                  href={safePath(r.path, "/search")}
+                  key={`${r.path}-${i}`}
+                >
+                  <span className="eyebrow">{r.type}</span>
+                  <b>{r.title}</b>
+                  {r.subtitle && <p>{r.subtitle}</p>}
+                </Link>
+              ))
+            ) : (
+              <div className="empty">
+                No results found. Try a different search term.
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="empty">
+            Enter a search term to explore the world of sport.
+          </div>
+        )}
+      </>
+    );
+  } else if (path === "cricket") {
+    const [matches, articles] = await Promise.all([
+      matchService.list({ size: 3 }),
+      newsService.list({ size: 3 }),
+    ]);
+    content = (
+      <>
+        <Crumbs items={[{ label: "Cricket" }]} />
+        <PageHeader
+          kicker="YOUR FRONT ROW SEAT"
+          title="Cricket"
+          description="Everything you love about the game, in one place."
+        />
+        <div className="profile-links">
+          <Link href="/cricket/live-scores">Live scores ↗</Link>
+          <Link href="/cricket/fixtures">Fixtures & results ↗</Link>
+          <Link href="/cricket/series">Series & tournaments ↗</Link>
+          <Link href="/teams">Teams ↗</Link>
+          <Link href="/rankings">Rankings ↗</Link>
+        </div>
+        <div className="section-block">
+          <SectionHeading
+            title="Around the grounds"
+            href="/cricket/live-scores"
+          />
+          <div className="match-grid">
+            {matches.content.map((m) => (
+              <MatchCard match={m} key={m.slug} />
+            ))}
+          </div>
+        </div>
+        <div className="section-block">
+          <SectionHeading title="Latest cricket stories" href="/news" />
+          <div className="article-grid">
+            {articles.content.map((a) => (
+              <ArticleCard article={a} key={a.slug} />
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  } else
+    content = (
+      <>
+        <Crumbs items={[{ label: info.title }]} />
+        <PageHeader title={info.title} />
+        <div className="content-box">
+          {path === "about" ? (
+            <>
+              <h2>For the love of the game.</h2>
+              <p>
+                The Boundary brings you the stories, scores and moments that
+                bring fans together.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2>Get in touch</h2>
+              <p>Contact information is not available yet.</p>
+            </>
+          )}
+        </div>
+      </>
+    );
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: site.url },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: info.title,
+        item: site.url + "/" + path,
+      },
+    ],
+  };
+  return (
+    <div className="shell page">
+      {content}
+      <JsonLd value={breadcrumb} />
+    </div>
+  );
 }

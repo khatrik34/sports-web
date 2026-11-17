@@ -1,35 +1,38 @@
-# The Boundary
+# The Boundary — public website
 
-A cricket-first sports media frontend built with Next.js App Router, React, strict TypeScript and Tailwind CSS. The editorial and match data is fictional demonstration content: scores are **not live**, videos do not stream, and newsletter submissions are not stored. Generated original imagery is included locally. No backend, database or authentication is included.
+The existing Next.js public site now reads anonymous content from the sports backend's versioned public API. Pages render on the server; the browser does not fetch API endpoints or receive API credentials. There is no mock-data fallback. The backend is a separate application, and no authentication or database is implemented here.
 
-## Run locally
+## Local setup (Windows PowerShell)
 
-```sh
+1. Start PostgreSQL and the Java backend using its own README; verify `Invoke-RestMethod "http://localhost:8080/api/v1/public/news?size=2"` on the machine where it runs.
+2. In this repository:
+
+```powershell
 npm install
-cp .env.example .env.local
+Copy-Item .env.example .env.local
+# Edit .env.local: API_BASE_URL must be reachable from the Next.js server.
 npm run dev
+# Alternative port: npm run dev -- -p 3001
 ```
 
-Visit http://localhost:3000. Run `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` for verification. Node 20.9+ is required.
+Open `http://localhost:3000` (or 3001). Set `NEXT_PUBLIC_SITE_URL` to the actual website origin and configure backend `APP_PUBLIC_SITE_BASE_URL` to match, including the port. `API_BASE_URL=http://localhost:8080/api/v1` works only when Next.js and the backend run on the same machine/network namespace. It is **server-side only**; when deployed or previewed elsewhere, `localhost` on the user's computer is not reachable by the Next.js server. Use a reachable private backend hostname, not browser-side localhost calls. The API must be available at request time; outages produce errors, not invented scores.
 
-Set `NEXT_PUBLIC_SITE_URL` to the production origin for canonical URLs, structured data, robots and sitemap. `NEXT_PUBLIC_API_BASE_URL` is reserved for the future public API origin; the app currently uses mock services regardless of its value. Never put secrets in public environment variables.
+## Verification
+
+```powershell
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+Unit/contract tests use simulated HTTP responses; they do not demonstrate live backend integration. To run the real-backend browser suite on the same machine, first run `npx playwright install chromium`, start both services, then run `npm run test:e2e`. Optional `E2E_SITE_URL` and `E2E_API_BASE_URL` override the default local addresses. The suite expects the backend demo dataset. A manual end-to-end and responsive/accessibility check remains necessary. See [integration status](docs/public-api-integration.md) for endpoints, caveats and checks. Only published content returned by the backend is used; the site does not duplicate access-control logic.
 
 ## Architecture
 
-- `app/` — App Router pages, metadata, SEO routes, and error/loading boundaries. The catch-all route implements the content-driven section and detail routes.
-- `components/` — shared server-rendered presentation and small interactive client islands.
-- `types/` — domain models and future response/error contracts.
-- `mocks/` — centralized sample content.
-- `services/` — asynchronous typed service interfaces and mock implementations. Pages consume services, not mock arrays.
-- `lib/`, `config/` — formatting, shared helpers and environment configuration.
-- `tests/` — service and utility tests.
+- `app/` uses server-rendered routes, dynamic metadata, JSON-LD and sitemaps. Existing public URL structure is retained.
+- `services/` maps backend public DTOs into UI view models using Zod. Server-side fetches use `API_BASE_URL`, 60-second revalidation for editorial/list data, and `no-store` for match data. Public API failures are not silently replaced with sample data.
+- `proxy.ts` resolves editor-managed redirects via the backend for document paths; it accepts only relative destinations. Image URLs are rendered from API data without an image proxy; remote hosts must be reachable from visitors' browsers.
+- `lib/content.ts` sanitizes backend article HTML and Markdown before rendering. `types/` contains the site's view models; `tests/` contains isolated fixtures and adapter/component tests.
 
-## Connecting a Java API
-
-Implement the `ContentService<T>` interface for each domain using `fetch` against `NEXT_PUBLIC_API_BASE_URL`, validate responses with Zod, map DTOs into the existing domain types, and replace the exports in `services/index.ts`. Keep credentials and authorization decisions on the backend; do not store tokens or secrets in this frontend. Extend `PaginatedResponse` and query parameters as the backend contract is finalized. Choose caching and revalidation according to the endpoint: live scores must not be cached like editorial content. Use `lib/api.ts` for centralized error mapping and Zod response validation. For client-refetched features, wrap only that feature in `features/query-provider.tsx` and use `hooks/use-service-query.ts`; add endpoint-specific loading states and cancellation when integrating. The current asynchronous contract allows pages to remain independent of the mock storage.
-
-Metadata, canonical URLs, robots, sitemap and JSON-LD are generated from content. Before deployment, configure a real domain and publisher identity, replace illustrative content, implement an actual subscription service, review structured data and review the Google News sitemap using real eligible publication dates. Google News inclusion or ranking is not guaranteed. Lighthouse targets depend on deployment and real data; no score is guaranteed.
-
-## Backend and admin integration planning
-
-The existing frontend has not yet been connected to a backend. See [the frontend integration audit](docs/frontend-integration-audit.md), [architecture proposal](docs/platform-architecture-proposal.md), and [development progress](docs/development-progress.md) for the inventory, risks, proposed boundaries, and verification status. No admin authentication, database, or Java service is implemented in this repository.
+Set the real public origin before production. Provide CSP and other deployment security headers appropriate for that origin. Newsletter submission remains a non-persisted demo. No external live data feed is provided: match scores are entered by staff. Google News inclusion and Lighthouse scores are not guaranteed.
