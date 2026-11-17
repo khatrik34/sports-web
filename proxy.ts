@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { apiRequest, optional404, query } from "@/lib/api";
+import { apiRequest, optional404, query, ServiceError } from "@/lib/api";
 
 const redirectSchema = z.object({
   statusCode: z.number().int(),
@@ -42,8 +42,25 @@ export async function proxy(request: NextRequest) {
         new URL(item.toPath, request.url),
         item.statusCode,
       );
+    console.error("Redirect API returned an invalid destination or status");
     return unavailable();
-  } catch {
+  } catch (error) {
+    // Log only classified failures, never the configured URL or response body.
+    if (error instanceof ServiceError) {
+      console.error("Redirect API request failed", {
+        code: [
+          "api_not_configured",
+          "invalid_api_base_url",
+          "upstream_unreachable",
+          "invalid_response",
+        ].includes(error.code || "")
+          ? error.code
+          : "upstream_error",
+        status: error.status,
+      });
+    } else {
+      console.error("Redirect API request failed unexpectedly");
+    }
     return unavailable();
   }
 }

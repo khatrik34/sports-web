@@ -4,7 +4,7 @@ The existing Next.js public site now reads anonymous content from the sports bac
 
 ## Local setup (Windows PowerShell)
 
-1. Start PostgreSQL and the Java backend using its own README; verify `Invoke-RestMethod "http://localhost:8080/api/v1/public/news?size=2"` on the machine where it runs.
+1. Start PostgreSQL and the Java backend using its own README; verify `Invoke-RestMethod "http://127.0.0.1:8080/api/v1/public/news?size=2"` on the machine where it runs.
 2. In this repository:
 
 ```powershell
@@ -15,7 +15,7 @@ npm run dev
 # Alternative port: npm run dev -- -p 3002
 ```
 
-Open `http://localhost:3001` (the admin can continue using port 3000). Both `npm run dev` and `npm start` default to 3001; an explicit `PORT` environment variable or `-p` argument overrides it. If you already have `.env.local`, update `NEXT_PUBLIC_SITE_URL=http://localhost:3001` there as well. Set `NEXT_PUBLIC_SITE_URL` to the actual website origin and configure backend `APP_PUBLIC_SITE_BASE_URL` to match, including the port. `API_BASE_URL=http://localhost:8080/api/v1` works only when Next.js and the backend run on the same machine/network namespace. It is **server-side only**; when deployed or previewed elsewhere, `localhost` on the user's computer is not reachable by the Next.js server. Use a reachable private backend hostname, not browser-side localhost calls. The API must be available at request time; outages produce errors, not invented scores.
+Open `http://localhost:3001` (the admin can continue using port 3000). Both `npm run dev` and `npm start` default to 3001; an explicit `PORT` environment variable or `-p` argument overrides it. If you already have `.env.local`, update `NEXT_PUBLIC_SITE_URL=http://localhost:3001` there as well. Set `NEXT_PUBLIC_SITE_URL` to the actual website origin and configure backend `APP_PUBLIC_SITE_BASE_URL` to match, including the port. `API_BASE_URL=http://127.0.0.1:8080/api/v1` works only when Next.js and the backend run on the same machine/network namespace. It is **server-side only**; when deployed or previewed elsewhere, `localhost` on the user's computer is not reachable by the Next.js server. Use a reachable private backend hostname, not browser-side localhost calls. In development, if `API_BASE_URL` is unset the site defaults to `http://127.0.0.1:8080/api/v1`, and a configured `localhost` backend is resolved via IPv4. Production requires an explicit `API_BASE_URL`. The API must be available at request time; outages produce errors, not invented scores.
 
 ## Verification
 
@@ -36,3 +36,7 @@ Unit/contract tests use simulated HTTP responses; they do not demonstrate live b
 - `lib/content.ts` sanitizes backend article HTML and Markdown before rendering. `types/` contains the site's view models; `tests/` contains isolated fixtures and adapter/component tests.
 
 Set the real public origin before production. Provide CSP and other deployment security headers appropriate for that origin. Newsletter submission remains a non-persisted demo. No external live data feed is provided: match scores are entered by staff. Google News inclusion and Lighthouse scores are not guaranteed.
+
+## Troubleshooting backend access
+
+If the website says “The service is temporarily unavailable”, check the website terminal for `Redirect API request failed` and its code/status. From the same machine/network namespace as Next.js, test `http://127.0.0.1:8080/api/v1/public/news?size=2` and `http://127.0.0.1:8080/api/v1/public/redirects?path=%2Fcricket%2Flive`. A 200 news response shows that endpoint is reachable; a 404 redirect response means no redirect was configured, not an outage. If `API_BASE_URL` is set to a different address in `.env.local` or the environment, configure the correct server-reachable URL and restart Next.js. Do not share credentials or private environment variables when requesting help. The backend's `APP_PUBLIC_SITE_BASE_URL` must independently be set to `http://localhost:3001` for local canonical URLs.

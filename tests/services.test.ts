@@ -165,3 +165,34 @@ describe("public API adapter", () => {
     await expect(newsService.list()).rejects.toBeInstanceOf(ServiceError);
   });
 });
+
+describe("local backend configuration", () => {
+  it("uses the IPv4 loopback default in development when API_BASE_URL is absent", async () => {
+    delete process.env.API_BASE_URL;
+    vi.stubEnv("NODE_ENV", "development");
+    const fetcher = vi.fn().mockResolvedValue(response(page([])));
+    vi.stubGlobal("fetch", fetcher);
+    await newsService.list();
+    expect(String(fetcher.mock.calls[0][0])).toMatch(
+      /^http:\/\/127\.0\.0\.1:8080\/api\/v1\/public\/news/,
+    );
+  });
+  it("uses IPv4 for configured localhost in development", async () => {
+    process.env.API_BASE_URL = "http://localhost:8080/api/v1";
+    vi.stubEnv("NODE_ENV", "development");
+    const fetcher = vi.fn().mockResolvedValue(response(page([])));
+    vi.stubGlobal("fetch", fetcher);
+    await newsService.list();
+    expect(String(fetcher.mock.calls[0][0])).toContain(
+      "http://127.0.0.1:8080/",
+    );
+  });
+  it("requires an explicit API_BASE_URL in production", async () => {
+    delete process.env.API_BASE_URL;
+    vi.stubEnv("NODE_ENV", "production");
+    await expect(newsService.list()).rejects.toMatchObject({
+      code: "api_not_configured",
+    });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+});
